@@ -29,18 +29,24 @@ from graphrag.query.llm.oai.chat_openai import ChatOpenAI
 from graphrag.query.llm.oai.embedding import OpenAIEmbedding
 from graphrag.query.llm.oai.typing import OpenaiApiType
 from graphrag.query.question_gen.local_gen import LocalQuestionGen
-from graphrag.query.structured_search.local_search.mixed_context import LocalSearchMixedContext
+from graphrag.query.structured_search.local_search.mixed_context import (
+    LocalSearchMixedContext,
+)
 from graphrag.query.structured_search.local_search.search import LocalSearch
-from graphrag.query.structured_search.global_search.community_context import GlobalCommunityContext
+from graphrag.query.structured_search.global_search.community_context import (
+    GlobalCommunityContext,
+)
 from graphrag.query.structured_search.global_search.search import GlobalSearch
 from graphrag.vector_stores.lancedb import LanceDBVectorStore
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 # Set constants and configurations
-INPUT_DIR = os.getenv('INPUT_DIR')
+INPUT_DIR = os.getenv("INPUT_DIR")
 LANCEDB_URI = f"{INPUT_DIR}/lancedb"
 COMMUNITY_REPORT_TABLE = "create_final_community_reports"
 ENTITY_TABLE = "create_final_nodes"
@@ -110,11 +116,15 @@ async def setup_llm_and_embedder():
     api_key = os.environ.get("GRAPHRAG_API_KEY", "YOUR_API_KEY")
     api_key_embedding = os.environ.get("GRAPHRAG_API_KEY_EMBEDDING", api_key)
     api_base = os.environ.get("API_BASE", "https://api.openai.com/v1")
-    api_base_embedding = os.environ.get("API_BASE_EMBEDDING", "https://api.openai.com/v1")
+    api_base_embedding = os.environ.get(
+        "API_BASE_EMBEDDING", "https://api.openai.com/v1"
+    )
 
     # Get model names
     llm_model = os.environ.get("GRAPHRAG_LLM_MODEL", "gpt-3.5-turbo-0125")
-    embedding_model = os.environ.get("GRAPHRAG_EMBEDDING_MODEL", "text-embedding-3-small")
+    embedding_model = os.environ.get(
+        "GRAPHRAG_EMBEDDING_MODEL", "text-embedding-3-small"
+    )
 
     # Check if API key exists
     if api_key == "YOUR_API_KEY":
@@ -143,7 +153,6 @@ async def setup_llm_and_embedder():
         max_retries=20,
     )
 
-
     logger.info("LLM and embedder setup complete")
     return llm, token_encoder, text_embedder
 
@@ -155,12 +164,20 @@ async def load_context():
     logger.info("Loading context data")
     try:
         entity_df = pd.read_parquet(f"{INPUT_DIR}/{ENTITY_TABLE}.parquet")
-        entity_embedding_df = pd.read_parquet(f"{INPUT_DIR}/{ENTITY_EMBEDDING_TABLE}.parquet")
-        entities = read_indexer_entities(entity_df, entity_embedding_df, COMMUNITY_LEVEL)
+        entity_embedding_df = pd.read_parquet(
+            f"{INPUT_DIR}/{ENTITY_EMBEDDING_TABLE}.parquet"
+        )
+        entities = read_indexer_entities(
+            entity_df, entity_embedding_df, COMMUNITY_LEVEL
+        )
 
-        description_embedding_store = LanceDBVectorStore(collection_name="entity_description_embeddings")
+        description_embedding_store = LanceDBVectorStore(
+            collection_name="entity_description_embeddings"
+        )
         description_embedding_store.connect(db_uri=LANCEDB_URI)
-        store_entity_semantic_embeddings(entities=entities, vectorstore=description_embedding_store)
+        store_entity_semantic_embeddings(
+            entities=entities, vectorstore=description_embedding_store
+        )
 
         relationship_df = pd.read_parquet(f"{INPUT_DIR}/{RELATIONSHIP_TABLE}.parquet")
         relationships = read_indexer_relationships(relationship_df)
@@ -177,14 +194,30 @@ async def load_context():
         covariates = {"claims": claims}
 
         logger.info("Context data loading complete")
-        return entities, relationships, reports, text_units, description_embedding_store, covariates
+        return (
+            entities,
+            relationships,
+            reports,
+            text_units,
+            description_embedding_store,
+            covariates,
+        )
     except Exception as e:
         logger.error(f"Error loading context data: {str(e)}")
         raise
 
 
-async def setup_search_engines(llm, token_encoder, text_embedder, entities, relationships, reports, text_units,
-                               description_embedding_store, covariates):
+async def setup_search_engines(
+    llm,
+    token_encoder,
+    text_embedder,
+    entities,
+    relationships,
+    reports,
+    text_units,
+    description_embedding_store,
+    covariates,
+):
     """
     Set up local and global search engines
     """
@@ -278,29 +311,35 @@ async def setup_search_engines(llm, token_encoder, text_embedder, entities, rela
     )
 
     logger.info("Search engines setup complete")
-    return local_search_engine, global_search_engine, local_context_builder, local_llm_params, local_context_params
+    return (
+        local_search_engine,
+        global_search_engine,
+        local_context_builder,
+        local_llm_params,
+        local_context_params,
+    )
 
 
 def format_response(response):
     """
     Format the response by adding appropriate line breaks and paragraph separations.
     """
-    paragraphs = re.split(r'\n{2,}', response)
+    paragraphs = re.split(r"\n{2,}", response)
 
     formatted_paragraphs = []
     for para in paragraphs:
-        if '```' in para:
-            parts = para.split('```')
+        if "```" in para:
+            parts = para.split("```")
             for i, part in enumerate(parts):
                 if i % 2 == 1:  # This is a code block
                     parts[i] = f"\n```\n{part.strip()}\n```\n"
-            para = ''.join(parts)
+            para = "".join(parts)
         else:
-            para = para.replace('. ', '.\n')
+            para = para.replace(". ", ".\n")
 
         formatted_paragraphs.append(para.strip())
 
-    return '\n\n'.join(formatted_paragraphs)
+    return "\n\n".join(formatted_paragraphs)
 
 
 async def tavily_search(prompt: str):
@@ -308,12 +347,12 @@ async def tavily_search(prompt: str):
     Perform a search using the Tavily API
     """
     try:
-        client = TavilyClient(api_key=os.environ['TAVILY_API_KEY'])
+        client = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
         resp = client.search(prompt, search_depth="advanced")
 
         # Convert Tavily response to Markdown format
         markdown_response = "# Search Results\n\n"
-        for result in resp.get('results', []):
+        for result in resp.get("results", []):
             markdown_response += f"## [{result['title']}]({result['url']})\n\n"
             markdown_response += f"{result['content']}\n\n"
 
@@ -329,10 +368,30 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Initializing search engines and question generator...")
         llm, token_encoder, text_embedder = await setup_llm_and_embedder()
-        entities, relationships, reports, text_units, description_embedding_store, covariates = await load_context()
-        local_search_engine, global_search_engine, local_context_builder, local_llm_params, local_context_params = await setup_search_engines(
-            llm, token_encoder, text_embedder, entities, relationships, reports, text_units,
-            description_embedding_store, covariates
+        (
+            entities,
+            relationships,
+            reports,
+            text_units,
+            description_embedding_store,
+            covariates,
+        ) = await load_context()
+        (
+            local_search_engine,
+            global_search_engine,
+            local_context_builder,
+            local_llm_params,
+            local_context_params,
+        ) = await setup_search_engines(
+            llm,
+            token_encoder,
+            text_embedder,
+            entities,
+            relationships,
+            reports,
+            text_units,
+            description_embedding_store,
+            covariates,
         )
 
         question_generator = LocalQuestionGen(
@@ -358,6 +417,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Add the following code to the chat_completions function
 
+
 async def full_model_search(prompt: str):
     """
     Perform a full model search, including local retrieval, global retrieval, and Tavily search
@@ -379,6 +439,7 @@ async def full_model_search(prompt: str):
     formatted_result += tavily_result + "\n\n"
 
     return formatted_result
+
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
@@ -408,9 +469,10 @@ async def chat_completions(request: ChatCompletionRequest):
 
         # Handle streaming and non-streaming responses
         if request.stream:
+
             async def generate_stream():
                 chunk_id = f"chatcmpl-{uuid.uuid4().hex}"
-                lines = formatted_response.split('\n')
+                lines = formatted_response.split("\n")
                 for i, line in enumerate(lines):
                     chunk = {
                         "id": chunk_id,
@@ -420,10 +482,12 @@ async def chat_completions(request: ChatCompletionRequest):
                         "choices": [
                             {
                                 "index": 0,
-                                "delta": {"content": line + '\n'}, # if i > 0 else {"role": "assistant", "content": ""},
-                                "finish_reason": None
+                                "delta": {
+                                    "content": line + "\n"
+                                },  # if i > 0 else {"role": "assistant", "content": ""},
+                                "finish_reason": None,
                             }
-                        ]
+                        ],
                     }
                     yield f"data: {json.dumps(chunk)}\n\n"
                     await asyncio.sleep(0.05)
@@ -433,13 +497,7 @@ async def chat_completions(request: ChatCompletionRequest):
                     "object": "chat.completion.chunk",
                     "created": int(time.time()),
                     "model": request.model,
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": {},
-                            "finish_reason": "stop"
-                        }
-                    ]
+                    "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
                 }
                 yield f"data: {json.dumps(final_chunk)}\n\n"
                 yield "data: [DONE]\n\n"
@@ -452,14 +510,14 @@ async def chat_completions(request: ChatCompletionRequest):
                     ChatCompletionResponseChoice(
                         index=0,
                         message=Message(role="assistant", content=formatted_response),
-                        finish_reason="stop"
+                        finish_reason="stop",
                     )
                 ],
                 usage=Usage(
                     prompt_tokens=len(prompt.split()),
                     completion_tokens=len(formatted_response.split()),
-                    total_tokens=len(prompt.split()) + len(formatted_response.split())
-                )
+                    total_tokens=len(prompt.split()) + len(formatted_response.split()),
+                ),
             )
             logger.info(f"Sending response: {response}")
             return JSONResponse(content=response.dict())
@@ -467,6 +525,7 @@ async def chat_completions(request: ChatCompletionRequest):
     except Exception as e:
         logger.error(f"Error processing chat completion: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/v1/models")
 async def list_models():
@@ -476,22 +535,40 @@ async def list_models():
     logger.info("Received model list request")
     current_time = int(time.time())
     models = [
-        {"id": "graphrag-local-search:latest", "object": "model", "created": current_time - 100000, "owned_by": "graphrag"},
-        {"id": "graphrag-global-search:latest", "object": "model", "created": current_time - 95000, "owned_by": "graphrag"},
+        {
+            "id": "graphrag-local-search:latest",
+            "object": "model",
+            "created": current_time - 100000,
+            "owned_by": "graphrag",
+        },
+        {
+            "id": "graphrag-global-search:latest",
+            "object": "model",
+            "created": current_time - 95000,
+            "owned_by": "graphrag",
+        },
         # {"id": "graphrag-question-generator:latest", "object": "model", "created": current_time - 90000, "owned_by": "graphrag"},
         # {"id": "gpt-3.5-turbo:latest", "object": "model", "created": current_time - 80000, "owned_by": "openai"},
         # {"id": "text-embedding-3-small:latest", "object": "model", "created": current_time - 70000, "owned_by": "openai"},
-        {"id": "tavily-search:latest", "object": "model", "created": current_time - 85000, "owned_by": "tavily"},
-        {"id": "full-model:latest", "object": "model", "created": current_time - 80000, "owned_by": "combined"}
+        {
+            "id": "tavily-search:latest",
+            "object": "model",
+            "created": current_time - 85000,
+            "owned_by": "tavily",
+        },
+        {
+            "id": "full-model:latest",
+            "object": "model",
+            "created": current_time - 80000,
+            "owned_by": "combined",
+        },
     ]
 
-    response = {
-        "object": "list",
-        "data": models
-    }
+    response = {"object": "list", "data": models}
 
     logger.info(f"Sending model list: {response}")
     return JSONResponse(content=response)
+
 
 if __name__ == "__main__":
     import uvicorn
