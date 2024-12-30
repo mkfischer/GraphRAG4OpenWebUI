@@ -1,0 +1,4 @@
+.env
+include_text.txt
+working_prompt.txt
+.dockerignore
